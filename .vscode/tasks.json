@@ -1,0 +1,24 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build",
+      "type": "npm",
+      "script": "build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$tsc"],
+      "detail": "Builds both the extension host (esbuild) and webview (Vite)"
+    },
+    {
+      "label": "Watch Extension",
+      "type": "npm",
+      "script": "watch:ext",
+      "isBackground": true,
+      "problemMatcher": ["$tsc-watch"],
+      "detail": "Watch the extension host with esbuild"
+    }
+  ]
+}
