@@ -13,12 +13,30 @@
       "detail": "Builds both the extension host (esbuild) and webview (Vite)"
     },
     {
-      "label": "Watch Extension",
+      "label": "Watch Extension Host",
       "type": "npm",
       "script": "watch:ext",
       "isBackground": true,
       "problemMatcher": ["$tsc-watch"],
       "detail": "Watch the extension host with esbuild"
+    },
+    {
+      "label": "Watch Webview",
+      "type": "npm",
+      "script": "watch:webview",
+      "isBackground": true,
+      "problemMatcher": [],
+      "detail": "Watch the React webview with Vite"
+    },
+    {
+      "label": "Watch All",
+      "dependsOn": ["Watch Extension Host", "Watch Webview"],
+      "dependsOrder": "parallel",
+      "group": {
+        "kind": "build"
+      },
+      "problemMatcher": [],
+      "detail": "Watch both extension host and webview in parallel"
     }
   ]
 }

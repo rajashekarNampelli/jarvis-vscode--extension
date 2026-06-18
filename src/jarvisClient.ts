@@ -48,12 +48,20 @@ export async function* streamChat(
       if (!match) {
         continue;
       }
-      const payload = match[1].trim();
-      if (payload === '[DONE]') {
+      const payload = match[1];
+      if (payload.trim() === '[DONE]') {
         return;
       }
-      if (payload) {
-        yield payload;
+      if (!payload) {
+        continue;
+      }
+      try {
+        const { token } = JSON.parse(payload) as { token: string };
+        if (token) {
+          yield token;
+        }
+      } catch {
+        // ignore malformed keep-alive or comment lines
       }
     }
   }

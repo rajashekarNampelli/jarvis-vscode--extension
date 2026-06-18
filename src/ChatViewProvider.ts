@@ -38,6 +38,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.post({ type: 'cleared' });
   }
 
+  private get baseUrl(): string {
+    return vscode.workspace
+      .getConfiguration('jarvis')
+      .get<string>('baseUrl', 'http://localhost:8001');
+  }
+
   private post(msg: WebviewMessageOut): void {
     this.view?.webview.postMessage(msg);
   }
@@ -46,13 +52,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     msg: WebviewMessageIn,
     webview: vscode.Webview
   ): Promise<void> {
-    const baseUrl = vscode.workspace
-      .getConfiguration('jarvis')
-      .get<string>('baseUrl', 'http://localhost:8000');
-
     if (msg.type === 'getModels') {
       try {
-        const models = await listModels(baseUrl);
+        const models = await listModels(this.baseUrl);
         webview.postMessage({ type: 'models', models } satisfies WebviewMessageOut);
       } catch (err) {
         vscode.window.showErrorMessage(`Jarvis: Could not fetch models — ${String(err)}`);
@@ -63,7 +65,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (msg.type === 'chat') {
       const { id, message, model } = msg;
       try {
-        for await (const token of streamChat(baseUrl, message, model)) {
+        for await (const token of streamChat(this.baseUrl, message, model)) {
           webview.postMessage({ type: 'token', id, token } satisfies WebviewMessageOut);
         }
         webview.postMessage({ type: 'done', id } satisfies WebviewMessageOut);
@@ -100,13 +102,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     <meta http-equiv="Content-Security-Policy"
       content="default-src 'none';
                style-src ${webview.cspSource} 'unsafe-inline';
-               script-src 'nonce-${nonce}';" />
+               script-src 'nonce-${nonce}';
+               connect-src ${this.baseUrl};" />
     <link rel="stylesheet" href="${styleUri}" />
     <title>Jarvis</title>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
+    <script nonce="${nonce}" src="${scriptUri}"></script>
   </body>
 </html>`;
   }

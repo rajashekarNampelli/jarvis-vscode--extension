@@ -9,6 +9,7 @@ A VS Code sidebar chat panel powered by [jarvis-model-router](../jarvis-model-ro
 - Streamed responses via SSE (`POST /v1/chat/stream`) — tokens appear as they arrive
 - Follows VS Code's active color theme (light/dark/high-contrast)
 - `Jarvis: Refresh Models` and `Jarvis: Clear Chat` commands available in the Command Palette
+- Full Markdown rendering in assistant responses (headings, bold, code blocks, tables, lists) via `react-markdown` + `remark-gfm`
 
 ## Prerequisites
 
@@ -16,7 +17,7 @@ A VS Code sidebar chat panel powered by [jarvis-model-router](../jarvis-model-ro
 |---|---|
 | VS Code | 1.90+ |
 | Node.js | 18+ |
-| [jarvis-model-router](../jarvis-model-router) | running on `http://localhost:8000` |
+| [jarvis-model-router](../jarvis-model-router) | running on `http://localhost:8001` |
 
 ## Quick start (development)
 
@@ -35,10 +36,10 @@ npm run build
 
 ### Manual smoke test
 
-1. Start `jarvis-model-router` on port 8000:
+1. Start `jarvis-model-router` on port 8001:
    ```bash
    cd ../jarvis-model-router
-   uvicorn jarvis_model_router.main:app --port 8000
+   uvicorn jarvis_model_router.main:app --port 8001 --host 0.0.0.0
    ```
 2. Press **F5** in VS Code — a new _Extension Development Host_ window opens.
 3. Click the **Jarvis** icon in the Activity Bar (left sidebar).
@@ -58,7 +59,7 @@ Settings → Jarvis → Base Url
 Or directly in `settings.json`:
 
 ```json
-"jarvis.baseUrl": "http://localhost:8000"
+"jarvis.baseUrl": "http://localhost:8001"
 ```
 
 ## Project structure
@@ -120,6 +121,6 @@ npm run package
 
 - Multi-turn conversation memory (client-side message concatenation)
 - Auto-inject active editor selection as context
-- Markdown + syntax-highlighted code block rendering (`react-markdown`)
+- Syntax-highlighted code blocks (Shiki)
 - Conversation export
 - Test suite (Vitest for webview, `@vscode/test-electron` for host)

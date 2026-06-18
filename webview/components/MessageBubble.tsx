@@ -1,4 +1,6 @@
 import React from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { Message } from '../hooks/useChat';
 
 interface Props {
@@ -16,7 +18,7 @@ export function MessageBubble({ message }: Props) {
         {isUser ? 'You' : 'Jarvis'}
       </span>
       <div
-        className={`rounded-lg px-3 py-2 text-sm max-w-[90%] whitespace-pre-wrap break-words leading-relaxed ${
+        className={`msg-bubble rounded-lg px-3 py-2 text-sm max-w-[90%] break-words leading-relaxed ${
           message.streaming ? 'cursor-blink' : ''
         }`}
         style={{
@@ -29,8 +31,12 @@ export function MessageBubble({ message }: Props) {
           <span className="text-red-400">Error: {message.error}</span>
         ) : message.text === '' && message.streaming ? (
           <span className="opacity-40 text-xs">Thinking…</span>
+        ) : isUser ? (
+          <p className="whitespace-pre-wrap">{message.text}</p>
         ) : (
-          message.text
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {message.text}
+          </ReactMarkdown>
         )}
       </div>
     </div>
