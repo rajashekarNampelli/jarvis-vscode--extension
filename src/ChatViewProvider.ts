@@ -1,6 +1,8 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
+import { listWorkspaceFiles, readAttachments } from './fileContext';
 import { listModels, streamChat } from './jarvisClient';
-import type { WebviewMessageIn, WebviewMessageOut } from './types';
+import type { FileRef, WebviewMessageIn, WebviewMessageOut } from './types';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'jarvis.chatView';
@@ -41,7 +43,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private get baseUrl(): string {
     return vscode.workspace
       .getConfiguration('jarvis')
-      .get<string>('baseUrl', 'http://localhost:8001');
+      .get<string>('baseUrl', 'https://api.jarvis-ai-local-modelcloudflare.uk');
   }
 
   private post(msg: WebviewMessageOut): void {
@@ -62,10 +64,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    if (msg.type === 'chat') {
-      const { id, message, model } = msg;
+    if (msg.type === 'listFiles') {
       try {
-        for await (const token of streamChat(this.baseUrl, message, model)) {
+        const files = await listWorkspaceFiles();
+        webview.postMessage({ type: 'fileList', files } satisfies WebviewMessageOut);
+      } catch (err) {
+        vscode.window.showErrorMessage(`Jarvis: Could not list workspace files — ${String(err)}`);
+      }
+      return;
+    }
+
+    if (msg.type === 'pickFiles') {
+      await this.handlePickFiles(webview);
+      return;
+    }
+
+    if (msg.type === 'chat') {
+      const { id, message, model, attachments } = msg;
+      try {
+        const context = attachments.length > 0
+          ? await readAttachments(attachments)
+          : undefined;
+
+        for await (const token of streamChat(this.baseUrl, message, model, context)) {
           webview.postMessage({ type: 'token', id, token } satisfies WebviewMessageOut);
         }
         webview.postMessage({ type: 'done', id } satisfies WebviewMessageOut);
@@ -81,6 +102,52 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     if (msg.type === 'clearChat') {
       webview.postMessage({ type: 'cleared' } satisfies WebviewMessageOut);
+    }
+  }
+
+  private async handlePickFiles(webview: vscode.Webview): Promise<void> {
+    // Build QuickPick items from workspace files
+    const workspaceFiles = await listWorkspaceFiles();
+
+    type QuickPickFileItem = vscode.QuickPickItem & { fileRef: FileRef };
+
+    const items: QuickPickFileItem[] = workspaceFiles.map((f) => ({
+      label: f.name,
+      description: f.path,
+      fileRef: f,
+    }));
+
+    // Prepend active editor file if available
+    const activeDoc = vscode.window.activeTextEditor?.document;
+    if (activeDoc && !activeDoc.isUntitled) {
+      const activePath = vscode.workspace.asRelativePath(activeDoc.uri, false);
+      const activeName = path.basename(activeDoc.uri.fsPath);
+      const alreadyListed = items.some((i) => i.fileRef.path === activePath);
+      if (!alreadyListed) {
+        items.unshift({
+          label: activeName,
+          description: `${activePath}  (active editor)`,
+          fileRef: { path: activePath, name: activeName },
+        });
+      } else {
+        // Move to top and annotate
+        const idx = items.findIndex((i) => i.fileRef.path === activePath);
+        const [existing] = items.splice(idx, 1);
+        existing.description = `${activePath}  (active editor)`;
+        items.unshift(existing);
+      }
+    }
+
+    const picked = await vscode.window.showQuickPick(items, {
+      canPickMany: true,
+      title: 'Add files to Jarvis context',
+      placeHolder: 'Select workspace files to attach',
+      matchOnDescription: true,
+    });
+
+    if (picked && picked.length > 0) {
+      const files: FileRef[] = picked.map((p) => p.fileRef);
+      webview.postMessage({ type: 'filesPicked', files } satisfies WebviewMessageOut);
     }
   }
 

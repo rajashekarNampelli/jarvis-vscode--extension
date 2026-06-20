@@ -1,23 +1,43 @@
 import type { ModelInfo } from './types';
 
+function hasStringToken(v: unknown): v is { token: string } {
+  return typeof v === 'object' && v !== null && 'token' in v && typeof (v as Record<string, unknown>).token === 'string';
+}
+
+/** Accept JSON-wrapped SSE (`{"token":"Hi"}`) or legacy raw tokens (`Hi`). */
+function parseSseToken(payload: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(payload);
+    if (hasStringToken(parsed)) {
+      return parsed.token.length > 0 ? parsed.token : null;
+    }
+  } catch {
+    // Fall through to raw token handling.
+  }
+
+  const token = payload.trim();
+  return token.length > 0 ? token : null;
+}
+
 export async function listModels(baseUrl: string): Promise<ModelInfo[]> {
   const response = await fetch(`${baseUrl}/v1/models`);
   if (!response.ok) {
     throw new Error(`Failed to fetch models: ${response.status} ${response.statusText}`);
   }
-  const json = await response.json();
-  return json.models as ModelInfo[];
+  const json = await response.json() as { models: ModelInfo[] };
+  return json.models;
 }
 
 export async function* streamChat(
   baseUrl: string,
   message: string,
-  model: string
+  model: string,
+  context?: string
 ): AsyncGenerator<string> {
   const response = await fetch(`${baseUrl}/v1/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, model }),
+    body: JSON.stringify({ message, model, context }),
   });
 
   if (!response.ok) {
@@ -55,13 +75,9 @@ export async function* streamChat(
       if (!payload) {
         continue;
       }
-      try {
-        const { token } = JSON.parse(payload) as { token: string };
-        if (token) {
-          yield token;
-        }
-      } catch {
-        // ignore malformed keep-alive or comment lines
+      const token = parseSseToken(payload);
+      if (token) {
+        yield token;
       }
     }
   }

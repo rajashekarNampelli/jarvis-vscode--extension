@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import type { FileRef, ModelInfo } from '../../src/types';
 import { vscodeApi } from '../lib/vscode';
 
-export interface ModelInfo {
-  key: string;
-  provider: string;
-  name: string;
-}
+export type { FileRef, ModelInfo };
 
 export interface Message {
   id: string;
@@ -13,6 +10,7 @@ export interface Message {
   text: string;
   streaming: boolean;
   error?: string;
+  attachments?: FileRef[];
 }
 
 export function useChat() {
@@ -20,13 +18,29 @@ export function useChat() {
   const [selectedModel, setSelectedModel] = useState<string>('auto');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [availableFiles, setAvailableFiles] = useState<FileRef[]>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<FileRef[]>([]);
 
-  const messagesRef = useRef(messages);
-  messagesRef.current = messages;
+  // --- Stable callbacks (defined before effects that reference them) ---
 
-  // Fetch models on mount
+  const addAttachments = useCallback((files: FileRef[]) => {
+    setPendingAttachments((prev) => {
+      const existingPaths = new Set(prev.map((f) => f.path));
+      const deduped = files.filter((f) => !existingPaths.has(f.path));
+      return [...prev, ...deduped];
+    });
+  }, []);
+
+  const removeAttachment = useCallback((filePath: string) => {
+    setPendingAttachments((prev) => prev.filter((f) => f.path !== filePath));
+  }, []);
+
+  // --- Effects ---
+
+  // Fetch models and workspace file list on mount
   useEffect(() => {
     vscodeApi.postMessage({ type: 'getModels' });
+    vscodeApi.postMessage({ type: 'listFiles' });
   }, []);
 
   // Listen for messages from the extension host
@@ -35,11 +49,18 @@ export function useChat() {
       const msg = event.data;
 
       if (msg.type === 'models') {
-        const withAuto: ModelInfo[] = [
+        setModels([
           { key: 'auto', provider: 'router', name: 'Auto (router decides)' },
           ...msg.models,
-        ];
-        setModels(withAuto);
+        ]);
+      }
+
+      if (msg.type === 'fileList') {
+        setAvailableFiles(msg.files as FileRef[]);
+      }
+
+      if (msg.type === 'filesPicked') {
+        addAttachments(msg.files as FileRef[]);
       }
 
       if (msg.type === 'token') {
@@ -74,16 +95,19 @@ export function useChat() {
 
       if (msg.type === 'cleared') {
         setMessages([]);
+        setPendingAttachments([]);
         setIsStreaming(false);
       }
     };
 
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, []);
+  }, [addAttachments]);
+
+  // --- Action callbacks ---
 
   const send = useCallback(
-    (text: string) => {
+    (text: string, attachments: FileRef[]) => {
       if (isStreaming || !text.trim()) return;
 
       const userId = crypto.randomUUID();
@@ -91,16 +115,24 @@ export function useChat() {
 
       setMessages((prev) => [
         ...prev,
-        { id: userId, role: 'user', text: text.trim(), streaming: false },
+        {
+          id: userId,
+          role: 'user',
+          text: text.trim(),
+          streaming: false,
+          attachments: attachments.length > 0 ? attachments : undefined,
+        },
         { id: asstId, role: 'assistant', text: '', streaming: true },
       ]);
       setIsStreaming(true);
+      setPendingAttachments([]);
 
       vscodeApi.postMessage({
         type: 'chat',
         id: asstId,
         message: text.trim(),
         model: selectedModel,
+        attachments: attachments.map((f) => f.path),
       });
     },
     [isStreaming, selectedModel]
@@ -118,5 +150,9 @@ export function useChat() {
     isStreaming,
     send,
     clearChat,
+    availableFiles,
+    pendingAttachments,
+    addAttachments,
+    removeAttachment,
   };
 }

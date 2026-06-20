@@ -17,6 +17,30 @@ export function MessageBubble({ message }: Props) {
       >
         {isUser ? 'You' : 'Jarvis'}
       </span>
+
+      {/* Attachment chips — shown above the user bubble */}
+      {isUser && message.attachments && message.attachments.length > 0 && (
+        <div className="flex flex-wrap gap-1 max-w-[90%] justify-end">
+          {message.attachments.map((f) => (
+            <span
+              key={f.path}
+              className="rounded text-xs px-2 py-0.5"
+              style={{
+                background: 'var(--badge-bg)',
+                color: 'var(--badge-fg)',
+                maxWidth: '200px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+              title={f.path}
+            >
+              {f.name}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div
         className={`msg-bubble rounded-lg px-3 py-2 text-sm max-w-[90%] break-words leading-relaxed ${
           message.streaming ? 'cursor-blink' : ''

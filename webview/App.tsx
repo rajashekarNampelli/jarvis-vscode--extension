@@ -13,6 +13,10 @@ export default function App() {
     isStreaming,
     send,
     clearChat,
+    availableFiles,
+    pendingAttachments,
+    addAttachments,
+    removeAttachment,
   } = useChat();
 
   return (
@@ -48,7 +52,14 @@ export default function App() {
       <MessageList messages={messages} />
 
       {/* Input */}
-      <PromptInput onSend={send} disabled={isStreaming} />
+      <PromptInput
+        onSend={send}
+        disabled={isStreaming}
+        availableFiles={availableFiles}
+        pendingAttachments={pendingAttachments}
+        onAddAttachments={addAttachments}
+        onRemoveAttachment={removeAttachment}
+      />
     </div>
   );
 }

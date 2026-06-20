@@ -59,7 +59,7 @@
       "properties": {
         "jarvis.baseUrl": {
           "type": "string",
-          "default": "http://localhost:8001",
+          "default": "https://api.jarvis-ai-local-modelcloudflare.uk",
           "description": "Base URL of the jarvis-model-router service."
         }
       }
